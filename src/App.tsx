@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,6 +18,7 @@ import AdminResults from "./pages/AdminResults";
 import AdminStudents from "./pages/AdminStudents"; 
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import MongoTest from "./pages/MongoTest";
 
 // Layout
 import Layout from "./components/Layout";
@@ -49,6 +49,7 @@ const App = () => (
                 <Route path="courses" element={<Courses />} />
                 <Route path="courses/:id" element={<CourseDetails />} />
                 <Route path="login" element={<Login />} />
+                <Route path="mongo-test" element={<MongoTest />} />
                 
                 {/* Protected student routes */}
                 <Route path="dashboard" element={
@@ -72,7 +73,7 @@ const App = () => (
                 <Route index element={<AdminDashboard />} />
                 <Route path="courses" element={<AdminCourses />} />
                 <Route path="results" element={<AdminResults />} />
-                <Route path="students" element={<AdminStudents />} /> {/* New route for students */}
+                <Route path="students" element={<AdminStudents />} /> 
               </Route>
               
               <Route path="*" element={<NotFound />} />

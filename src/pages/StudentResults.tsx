@@ -1,43 +1,48 @@
-
-import { useState, useEffect } from "react";
-import { getStudentResults } from "@/lib/data";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import ResultCard, { Result } from "@/components/ResultCard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import { getStudentResults, type Result } from "@/services/resultService";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 const StudentResults = () => {
   const { user } = useAuth();
-  const [results, setResults] = useState<Result[]>([]);
-  const [filteredResults, setFilteredResults] = useState<Result[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [gradeFilter, setGradeFilter] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user) return;
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      const data = getStudentResults(user.id);
-      setResults(data);
-      setFilteredResults(data);
-      setIsLoading(false);
-    }, 1000);
-  }, [user]);
+  const { data: results = [], isLoading, error } = useQuery({
+    queryKey: ['studentResults'],
+    queryFn: getStudentResults,
+    enabled: !!user
+  });
 
-  useEffect(() => {
-    // Apply filters whenever search term or grade filter changes
-    const filtered = results.filter((result) => {
-      const matchesSearch = result.courseName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesGrade = gradeFilter === "all" || result.grade === gradeFilter;
-      return matchesSearch && matchesGrade;
-    });
-    
-    setFilteredResults(filtered);
-  }, [searchTerm, gradeFilter, results]);
+  // Filter results
+  const filteredResults = results.filter((result) => {
+    const matchesSearch = result.courseName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGrade = gradeFilter === "all" || result.grade === gradeFilter;
+    return matchesSearch && matchesGrade;
+  });
+
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
+              <p className="text-gray-600 mb-4">
+                Please log in to view your results.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -48,6 +53,23 @@ const StudentResults = () => {
             <p>Loading results...</p>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <h2 className="text-2xl font-bold mb-2">Error Loading Results</h2>
+              <p className="text-gray-600 mb-4">
+                {error instanceof Error ? error.message : 'Failed to load results. Please try again later.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -163,11 +185,36 @@ const StudentResults = () => {
 
       {/* Results list */}
       {filteredResults.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-4">
           {filteredResults.map((result, index) => (
-            <div key={result.id} className={`animate-in fade-in slide-in-from-bottom duration-500 delay-${Math.min(index * 100, 500)}`}>
-              <ResultCard result={result} />
-            </div>
+            <Card key={result._id} className={`animate-in fade-in slide-in-from-bottom duration-500 delay-${Math.min(index * 100, 500)}`}>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">{result.courseName}</CardTitle>
+                    <CardDescription>
+                      Date: {new Date(result.date).toLocaleDateString()}
+                    </CardDescription>
+                  </div>
+                  <Badge>{result.grade}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Score</span>
+                    <span>{result.score}/{result.maxScore}</span>
+                  </div>
+                  <Progress value={(result.score / result.maxScore) * 100} className="h-2" />
+                  {result.feedback && (
+                    <div className="mt-4 text-sm text-muted-foreground">
+                      <p className="font-medium mb-1">Feedback:</p>
+                      <p>{result.feedback}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       ) : (

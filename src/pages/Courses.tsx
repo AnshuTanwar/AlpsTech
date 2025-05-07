@@ -1,18 +1,26 @@
-
 import { useState } from "react";
-import { coursesData } from "@/lib/data";
-import CourseCard, { Course } from "@/components/CourseCard";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { getAllCourses, type Course } from "@/services/courseService";
+import CourseCard from "@/components/CourseCard";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 
 const Courses = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [sortOrder, setSortOrder] = useState<string>("default");
 
+  // Fetch courses with React Query
+  const { data: courses = [], isLoading, error } = useQuery({
+    queryKey: ['courses'],
+    queryFn: getAllCourses
+  });
+
   // Filter and sort courses
-  const filteredCourses = coursesData
+  const filteredCourses = courses
     .filter((course) => {
       const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -36,6 +44,36 @@ const Courses = () => {
           return 0;
       }
     });
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-blue mb-2"></div>
+            <p>Loading courses...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <h2 className="text-2xl font-bold mb-2">Error Loading Courses</h2>
+              <p className="text-gray-600 mb-4">
+                {error instanceof Error ? error.message : 'Failed to load courses. Please try again later.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -90,7 +128,7 @@ const Courses = () => {
         
         {/* Results count */}
         <p className="text-gray-600 mb-4">
-          Showing {filteredCourses.length} of {coursesData.length} courses
+          Showing {filteredCourses.length} of {courses.length} courses
         </p>
       </div>
       
@@ -98,7 +136,9 @@ const Courses = () => {
       {filteredCourses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCourses.map((course) => (
-            <CourseCard key={course.id} course={course} />
+            <Link key={course._id} to={`/courses/${course._id}`}>
+              <CourseCard course={course} />
+            </Link>
           ))}
         </div>
       ) : (

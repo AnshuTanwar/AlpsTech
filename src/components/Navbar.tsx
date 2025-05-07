@@ -90,7 +90,7 @@ const Navbar = () => {
                 <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
                 <path d="M6 12v5c3 3 9 3 12 0v-5" />
               </svg>
-              <span className="ml-2 text-xl font-bold text-foreground transition-colors duration-300">AlpsTech</span>
+              <span className="ml-2 text-xl font-bold text-foreground transition-colors duration-300">AlpesTech</span>
             </Link>
           </div>
           

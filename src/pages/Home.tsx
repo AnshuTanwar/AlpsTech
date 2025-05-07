@@ -1,18 +1,21 @@
-
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { coursesData } from "@/lib/data";
-import CourseCard from "@/components/CourseCard";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import LiveCounters from "@/components/LiveCounters";
 import FeatureShowcase from "@/components/FeatureShowcase";
 import { Sparkles } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getAllCourses } from "@/services/courseService";
+import CourseCard from "@/components/CourseCard";
 
 const Home = () => {
-  // Get featured courses (first 3 for demo)
-  const featuredCourses = coursesData.slice(0, 3);
+  const { data: courses = [], isLoading, error } = useQuery({
+    queryKey: ['courses'],
+    queryFn: getAllCourses
+  });
+  const featuredCourses = courses.slice(0, 3);
   const { theme } = useTheme();
   const [scrollY, setScrollY] = useState(0);
   const [isVisible, setIsVisible] = useState<{[key: string]: boolean}>({
@@ -47,6 +50,13 @@ const Home = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  if (isLoading) {
+    return <div className="text-center py-12">Loading featured courses...</div>;
+  }
+  if (error) {
+    return <div className="text-center py-12 text-red-500">Failed to load featured courses.</div>;
+  }
 
   return (
     <div className="space-y-20 pb-12">
@@ -148,7 +158,7 @@ const Home = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {featuredCourses.map((course, index) => (
               <div 
-                key={course.id} 
+                key={course._id} 
                 className="transform transition-all duration-700"
                 style={{ 
                   transitionDelay: `${index * 150}ms`,
@@ -156,7 +166,7 @@ const Home = () => {
                   transform: isVisible.courses ? 'translateY(0)' : 'translateY(20px)'
                 }}
               >
-                <CourseCard course={course} />
+                <CourseCard course={{ ...course, level: (['beginner', 'intermediate', 'advanced'].includes(course.level) ? course.level : 'beginner') as 'beginner' | 'intermediate' | 'advanced' }} />
               </div>
             ))}
           </div>

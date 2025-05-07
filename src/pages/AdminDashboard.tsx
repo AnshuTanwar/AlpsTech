@@ -1,24 +1,41 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LoadingBar } from "@/components/ui/loading-bar";
-import { coursesData, resultsData } from "@/lib/data";
-import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
+import { getDashboardStats, getRecentEnrollments, getLatestResults } from "@/services/dashboardService";
+import type { DashboardStats, Enrollment, Result } from "@/services/dashboardService";
 
 const AdminDashboard = () => {
-  const { users } = useAuth();
   const { theme } = useTheme();
-  const [stats, setStats] = useState({
-    totalCourses: 0,
-    totalStudents: 0,
-    totalResults: 0,
-    openEnrollments: 0,
+
+  const { 
+    data: stats, 
+    isLoading: isStatsLoading 
+  } = useQuery<DashboardStats>({
+    queryKey: ['dashboardStats'],
+    queryFn: getDashboardStats
   });
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState(0);
+
+  const {
+    data: recentEnrollments,
+    isLoading: isEnrollmentsLoading
+  } = useQuery<Enrollment[]>({
+    queryKey: ['recentEnrollments'],
+    queryFn: getRecentEnrollments
+  });
+
+  const {
+    data: latestResults,
+    isLoading: isResultsLoading
+  } = useQuery<Result[]>({
+    queryKey: ['latestResults'],
+    queryFn: getLatestResults
+  });
+
+  const isLoading = isStatsLoading || isEnrollmentsLoading || isResultsLoading;
 
   const getGradeBadgeStyle = (grade: string) => {
     if (theme === "dark") {
@@ -60,36 +77,12 @@ const AdminDashboard = () => {
     }
   };
 
-  useEffect(() => {
-    const loadingInterval = setInterval(() => {
-      setLoadingProgress(prev => {
-        const newProgress = prev + 20;
-        return newProgress >= 100 ? 100 : newProgress;
-      });
-    }, 250);
-    
-    const studentCount = users.filter(user => user.role === "student").length;
-
-    setTimeout(() => {
-      setStats({
-        totalCourses: coursesData.length,
-        totalStudents: studentCount,
-        totalResults: resultsData.length,
-        openEnrollments: coursesData.filter(c => c.enrollmentStatus === "open").length,
-      });
-      setIsLoading(false);
-      clearInterval(loadingInterval);
-    }, 800);
-    
-    return () => clearInterval(loadingInterval);
-  }, [users]);
-
   if (isLoading) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[400px] gap-4">
         <LoadingBar 
           className="w-64"
-          progress={loadingProgress}
+          progress={100}
           variant="primary"
         />
         <p className="text-muted-foreground">Loading dashboard...</p>
@@ -115,7 +108,7 @@ const AdminDashboard = () => {
           <CardContent>
             <div className="flex items-center justify-center h-24">
               <div className="text-4xl font-bold text-brand-blue">
-                {stats.totalCourses}
+                {stats?.totalCourses || 0}
               </div>
             </div>
           </CardContent>
@@ -136,7 +129,7 @@ const AdminDashboard = () => {
           <CardContent>
             <div className="flex items-center justify-center h-24">
               <div className="text-4xl font-bold text-brand-blue">
-                {stats.totalStudents}
+                {stats?.totalStudents || 0}
               </div>
             </div>
           </CardContent>
@@ -157,7 +150,7 @@ const AdminDashboard = () => {
           <CardContent>
             <div className="flex items-center justify-center h-24">
               <div className="text-4xl font-bold text-brand-blue">
-                {stats.totalResults}
+                {stats?.totalResults || 0}
               </div>
             </div>
           </CardContent>
@@ -178,7 +171,7 @@ const AdminDashboard = () => {
           <CardContent>
             <div className="flex items-center justify-center h-24">
               <div className="text-4xl font-bold text-brand-blue">
-                {stats.openEnrollments}
+                {stats?.openEnrollments || 0}
               </div>
             </div>
           </CardContent>
@@ -200,42 +193,26 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-medium">Student {i + 1}</p>
-                      <p className="text-sm text-gray-600">Enrolled in {coursesData[i % coursesData.length].title}</p>
-                    </div>
+              {recentEnrollments?.map((enrollment) => (
+                <div key={enrollment._id} className="flex justify-between items-center">
+                  <div>
+                    <p className="font-medium">{enrollment.user[0]?.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Enrolled in {enrollment.course[0]?.title}
+                    </p>
                   </div>
-                  <span className="text-sm text-gray-500">
-                    {new Date(Date.now() - i * 86400000).toLocaleDateString()}
-                  </span>
+                  <div className="text-sm text-muted-foreground">
+                    {new Date(enrollment.enrollmentDate).toLocaleDateString()}
+                  </div>
                 </div>
               ))}
+              {(!recentEnrollments || recentEnrollments.length === 0) && (
+                <p className="text-muted-foreground text-center py-4">
+                  No recent enrollments
+                </p>
+              )}
             </div>
           </CardContent>
-          <CardFooter>
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/admin/students">View All Enrollments</Link>
-            </Button>
-          </CardFooter>
         </Card>
 
         <Card>
@@ -247,29 +224,34 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {resultsData.slice(0, 5).map((result, i) => (
-                <div key={i} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
+              {latestResults?.map((result) => (
+                <div key={result._id} className="flex justify-between items-center">
                   <div>
-                    <p className="font-medium">{result.courseName}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      Student ID: {Math.floor(Math.random() * 10000).toString().padStart(4, '0')} • Score: {result.score}/{result.maxScore}
+                    <p className="font-medium">{result.user[0]?.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {result.course[0]?.title}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <span className={cn("inline-block px-2 py-1 text-xs font-semibold rounded-full", getGradeBadgeStyle(result.grade))}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      {result.score}/{result.maxScore}
+                    </span>
+                    <span className={cn(
+                      "px-2 py-1 rounded text-xs",
+                      getGradeBadgeStyle(result.grade)
+                    )}>
                       Grade: {result.grade}
                     </span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{result.date}</p>
                   </div>
                 </div>
               ))}
+              {(!latestResults || latestResults.length === 0) && (
+                <p className="text-muted-foreground text-center py-4">
+                  No results available
+                </p>
+              )}
             </div>
           </CardContent>
-          <CardFooter>
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/admin/results">View All Results</Link>
-            </Button>
-          </CardFooter>
         </Card>
       </div>
     </div>

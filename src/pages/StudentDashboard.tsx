@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,46 +5,51 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { LoadingBar } from "@/components/ui/loading-bar";
-import { getEnrolledCourses, getStudentResults } from "@/lib/data";
 import { useAuth } from "@/hooks/useAuth";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useQuery } from "@tanstack/react-query";
+import { getStudentResults } from "@/services/resultService";
+import { getAllCourses } from "@/services/courseService";
+import { getAssignments, getAssignmentPdfUrl, Assignment } from '@/services/assignmentService';
+import { useQuery as useRQ } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
+import { FileText } from 'lucide-react';
 
 const StudentDashboard = () => {
   const { user } = useAuth();
-  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
-  const [results, setResults] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState(0);
+  // Fetch all courses and student results
+  const { data: allCourses = [] } = useQuery({
+    queryKey: ['courses'],
+    queryFn: getAllCourses
+  });
+  const { data: results = [], isLoading: isResultsLoading } = useQuery({
+    queryKey: ['studentResults'],
+    queryFn: getStudentResults,
+    enabled: !!user
+  });
+  // Filter enrolled courses for the user
+  const enrolledCourses = allCourses.filter((course: any) => user?.enrolledCourses?.includes(course._id));
+  const isLoading = isResultsLoading;
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const [currentVideoId, setCurrentVideoId] = useState("");
 
-  useEffect(() => {
-    if (!user) return;
-    
-    // Simulate API call with progress
-    const loadingInterval = setInterval(() => {
-      setLoadingProgress(prev => {
-        const newProgress = prev + 15;
-        return newProgress >= 100 ? 100 : newProgress;
-      });
-    }, 300);
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      setEnrolledCourses(getEnrolledCourses(user.id) as any[]);
-      setResults(getStudentResults(user.id));
-      setIsLoading(false);
-      clearInterval(loadingInterval);
-    }, 1000);
-    
-    return () => clearInterval(loadingInterval);
-  }, [user]);
+  // Array of video IDs for each module
+  const moduleVideos = [
+    "SzJ46YA_RaA",  // Module 1 video ID
+    "-uleG_Vecis",  // Module 2 video ID
+    "zOjov-2OZ0E",  // Module 3 video ID
+    "OdziYWEkDIM"   // Module 4 video ID
+  ];
+
+  const handleViewLessons = (moduleIndex: number) => {
+    setCurrentVideoId(moduleVideos[moduleIndex]);
+    setIsVideoOpen(true);
+  };
 
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col justify-center items-center min-h-[400px] gap-4">
-          <LoadingBar 
-            progress={loadingProgress} 
-            className="w-64 animate-pulse"
-          />
           <p className="text-muted-foreground animate-pulse">Loading your dashboard...</p>
         </div>
       </div>
@@ -56,6 +60,37 @@ const StudentDashboard = () => {
   const latestResult = results.length > 0 ? 
     results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] : 
     null;
+
+  // Assignment viewer for students
+  function AssignmentViewer({ courseId }: { courseId: string }) {
+    const { data: assignments = [], isLoading, error }: UseQueryResult<Assignment[]> = useRQ({
+      queryKey: ['assignments', courseId],
+      queryFn: () => getAssignments(courseId)
+    });
+    if (isLoading) return <div className="text-xs text-gray-500">Loading assignments...</div>;
+    if (error) return <div className="text-xs text-red-500">Failed to load assignments.</div>;
+    return (
+      <div className="mt-2">
+        <div className="font-semibold text-sm mb-1 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-blue-500" /> Assignments
+        </div>
+        {assignments.length === 0 ? (
+          <div className="text-xs text-gray-500">No assignments yet.</div>
+        ) : (
+          <ul className="space-y-2 mt-1">
+            {assignments.map((a: Assignment) => (
+              <li key={a._id} className="flex items-center gap-2 p-2 bg-gray-50 rounded shadow-sm">
+                <FileText className="w-4 h-4 text-blue-400" />
+                <span className="font-medium text-sm">{a.title}</span>
+                <a href={getAssignmentPdfUrl(a._id)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">View PDF</a>
+                <span className="text-xs text-gray-500">{a.description}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -169,7 +204,7 @@ const StudentDashboard = () => {
       </div>
 
       {/* Enrolled courses */}
-      <div className="mb-8">
+      <div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">My Courses</h2>
           <Button asChild variant="outline">
@@ -180,7 +215,7 @@ const StudentDashboard = () => {
         {enrolledCourses.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {enrolledCourses.map((course: any) => (
-              <Card key={course.id} className="overflow-hidden">
+              <Card key={course._id} className="overflow-hidden">
                 <div className="aspect-video overflow-hidden">
                   <img 
                     src={course.image} 
@@ -198,6 +233,7 @@ const StudentDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
+                    <AssignmentViewer courseId={course._id} />
                     <div>
                       <div className="flex justify-between mb-1 text-sm">
                         <span>Progress</span>
@@ -205,9 +241,18 @@ const StudentDashboard = () => {
                       </div>
                       <Progress value={40} className="h-2" />
                     </div>
-                    <Button asChild className="w-full">
-                      <Link to={`/courses/${course.id}`}>Continue Learning</Link>
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button asChild className="flex-1">
+                        <Link to={`/courses/${course._id}`}>Continue Learning</Link>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleViewLessons(0)}
+                      >
+                        Watch Video
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -227,6 +272,27 @@ const StudentDashboard = () => {
           </Card>
         )}
       </div>
+
+      {/* Video Dialog */}
+      <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Course Video</DialogTitle>
+          </DialogHeader>
+          <div className="aspect-video w-full">
+            <iframe
+              width="100%"
+              height="100%"
+              src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=1`}
+              title="Course Video"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="rounded-lg"
+            ></iframe>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Recent Results */}
       <div>
@@ -258,7 +324,7 @@ const StudentDashboard = () => {
               </thead>
               <tbody className="bg-white divide-y">
                 {results.slice(0, 3).map((result) => (
-                  <tr key={result.id}>
+                  <tr key={result._id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{result.courseName}</div>
                     </td>

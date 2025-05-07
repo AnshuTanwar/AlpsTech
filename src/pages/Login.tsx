@@ -93,7 +93,7 @@ const Login = () => {
     <div className="flex justify-center items-center min-h-[calc(100vh-16rem)]">
       <Card className="w-full max-w-md shadow-lg animate-in zoom-in">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Welcome to AlpsTech</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Welcome to AlpesTech</CardTitle>
           <CardDescription className="text-center">
             Access your personalized learning experience
           </CardDescription>

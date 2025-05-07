@@ -1,28 +1,37 @@
-
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
+import { LoadingBar } from "@/components/ui/loading-bar";
+import { getAllStudents, getStudentEnrollments } from "@/services/studentService";
+import type { Student, StudentEnrollment } from "@/services/studentService";
 
 const AdminStudents = () => {
-  const { users } = useAuth();
-  const [students, setStudents] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { 
+    data: students, 
+    isLoading: isStudentsLoading 
+  } = useQuery<Student[]>({
+    queryKey: ['students'],
+    queryFn: getAllStudents
+  });
 
-  useEffect(() => {
-    // Filter only student users
-    const studentUsers = users.filter(user => user.role === "student");
-    setStudents(studentUsers);
-    setIsLoading(false);
-  }, [users]);
+  const {
+    data: enrollments,
+    isLoading: isEnrollmentsLoading
+  } = useQuery<StudentEnrollment[]>({
+    queryKey: ['studentEnrollments'],
+    queryFn: getStudentEnrollments
+  });
+
+  const isLoading = isStudentsLoading || isEnrollmentsLoading;
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-blue mb-2"></div>
-          <p>Loading students...</p>
-        </div>
+      <div className="flex flex-col justify-center items-center min-h-[400px] gap-4">
+        <LoadingBar 
+          className="w-64"
+          progress={100}
+          variant="primary"
+        />
+        <p className="text-muted-foreground">Loading student data...</p>
       </div>
     );
   }
@@ -31,41 +40,38 @@ const AdminStudents = () => {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Students Management</h1>
-        <p className="text-gray-600">View and manage students enrolled in courses</p>
+        <p className="text-gray-600 dark:text-gray-300">View and manage students enrolled in courses</p>
       </div>
 
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle>All Students ({students.length})</CardTitle>
+          <CardTitle>All Students ({students?.length || 0})</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-100 dark:bg-gray-800">
-                  <th className="px-4 py-2 text-left">Name</th>
-                  <th className="px-4 py-2 text-left">Email</th>
-                  <th className="px-4 py-2 text-left">Enrolled Courses</th>
-                  <th className="px-4 py-2 text-left">Results</th>
-                  <th className="px-4 py-2 text-left">Actions</th>
+          <div className="relative overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs uppercase bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th scope="col" className="px-6 py-3">Name</th>
+                  <th scope="col" className="px-6 py-3">Email</th>
+                  <th scope="col" className="px-6 py-3">Enrolled Courses</th>
+                  <th scope="col" className="px-6 py-3">Results</th>
                 </tr>
               </thead>
               <tbody>
-                {students.length > 0 ? (
-                  students.map(student => (
-                    <tr key={student.id} className="border-t border-gray-200 dark:border-gray-700">
-                      <td className="px-4 py-3">{student.name}</td>
-                      <td className="px-4 py-3">{student.email}</td>
-                      <td className="px-4 py-3">{student.enrolledCourses ? student.enrolledCourses.length : 0}</td>
-                      <td className="px-4 py-3">{student.results ? student.results.length : 0}</td>
-                      <td className="px-4 py-3">
-                        <Button variant="outline" size="sm">View Details</Button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
+                {students?.map((student) => (
+                  <tr key={student._id} className="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
+                    <td className="px-6 py-4 font-medium">{student.name}</td>
+                    <td className="px-6 py-4">{student.email}</td>
+                    <td className="px-6 py-4">{student.enrolledCourses.length}</td>
+                    <td className="px-6 py-4">{student.results.length}</td>
+                  </tr>
+                ))}
+                {(!students || students.length === 0) && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-3 text-center">No students found</td>
+                    <td colSpan={4} className="px-6 py-4 text-center text-muted-foreground">
+                      No students found
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -79,28 +85,30 @@ const AdminStudents = () => {
           <CardTitle>Student Enrollments</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-100 dark:bg-gray-800">
-                  <th className="px-4 py-2 text-left">Student</th>
-                  <th className="px-4 py-2 text-left">Course</th>
-                  <th className="px-4 py-2 text-left">Enrollment Date</th>
+          <div className="relative overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs uppercase bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th scope="col" className="px-6 py-3">Student</th>
+                  <th scope="col" className="px-6 py-3">Course</th>
+                  <th scope="col" className="px-6 py-3">Enrollment Date</th>
                 </tr>
               </thead>
               <tbody>
-                {students.flatMap(student => 
-                  (student.enrolledCourses || []).map((courseId: string, index: number) => (
-                    <tr key={`${student.id}-${courseId}`} className="border-t border-gray-200 dark:border-gray-700">
-                      <td className="px-4 py-3">{student.name}</td>
-                      <td className="px-4 py-3">Course ID: {courseId}</td>
-                      <td className="px-4 py-3">{new Date(Date.now() - index * 86400000).toLocaleDateString()}</td>
-                    </tr>
-                  ))
-                )}
-                {students.every(student => !student.enrolledCourses || student.enrolledCourses.length === 0) && (
+                {enrollments?.map((enrollment) => (
+                  <tr key={enrollment._id} className="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
+                    <td className="px-6 py-4 font-medium">{enrollment.student.name}</td>
+                    <td className="px-6 py-4">{enrollment.course.title}</td>
+                    <td className="px-6 py-4">
+                      {new Date(enrollment.enrollmentDate).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+                {(!enrollments || enrollments.length === 0) && (
                   <tr>
-                    <td colSpan={3} className="px-4 py-3 text-center">No enrollments found</td>
+                    <td colSpan={3} className="px-6 py-4 text-center text-muted-foreground">
+                      No enrollments found
+                    </td>
                   </tr>
                 )}
               </tbody>

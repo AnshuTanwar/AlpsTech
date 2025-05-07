@@ -1,15 +1,6 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { toast } from "sonner";
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: "student" | "admin";
-  enrolledCourses?: string[]; 
-  results?: string[]; 
-}
+import { createUser, findUserByEmail, updateUserEnrollment, User, UserWithPassword } from "@/services/userService";
 
 interface AuthContextType {
   user: User | null;
@@ -17,53 +8,19 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
-  users: User[]; 
-  enrollInCourse: (courseId: string) => void;
+  users: User[];
+  enrollInCourse: (courseId: string) => Promise<void>;
   isEnrolled: (courseId: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-
-const initialUsers = [
-  {
-    id: "1",
-    name: "Student User",
-    email: "student@example.com",
-    password: "password123",
-    role: "student" as const,
-    enrolledCourses: ["1", "2", "5"], 
-    results: ["1", "2", "3"], 
-  },
-  {
-    id: "2",
-    name: "Admin User",
-    email: "admin@example.com",
-    password: "admin123",
-    role: "admin" as const,
-    enrolledCourses: [],
-    results: [],
-  },
-];
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-
-  const [usersWithPasswords, setUsersWithPasswords] = useState(() => {
-    const storedUsers = localStorage.getItem("users");
-    return storedUsers ? JSON.parse(storedUsers) : initialUsers;
-  });
-
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  const usersWithoutPasswords = usersWithPasswords.map(({ password, ...userWithoutPassword }) => userWithoutPassword);
-
-  useEffect(() => {
-    localStorage.setItem("users", JSON.stringify(usersWithPasswords));
-  }, [usersWithPasswords]);
+  const [users] = useState<User[]>([]);
 
   useEffect(() => {
-
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       setUser(JSON.parse(storedUser));
@@ -74,14 +31,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const foundUser = await findUserByEmail(email);
 
-      const foundUser = usersWithPasswords.find(
-        (u) => u.email === email && u.password === password
-      );
-
-      if (foundUser) {
-        const { password, ...userWithoutPassword } = foundUser;
+      if (foundUser && foundUser.password === password) {
+        const { password: _, ...userWithoutPassword } = foundUser;
         setUser(userWithoutPassword);
         localStorage.setItem("user", JSON.stringify(userWithoutPassword));
         toast.success(`Welcome back, ${userWithoutPassword.name}!`);
@@ -89,8 +42,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         toast.error("Invalid email or password");
       }
     } catch (error) {
+      console.error('Login error:', error);
       toast.error("Login failed. Please try again.");
-      console.error(error);
     } finally {
       setIsLoading(false);
     }
@@ -99,37 +52,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signup = async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const emailExists = usersWithPasswords.some(user => user.email === email);
-      if (emailExists) {
-        toast.error("Email already registered. Please use a different email.");
-        setIsLoading(false);
-        return false;
-      }
-      
-      const newUser = {
-        id: (usersWithPasswords.length + 1).toString(),
+      const newUser = await createUser({
         name,
         email,
         password,
-        role: "student" as const,
-        enrolledCourses: [], 
-        results: [], 
-      };
-      
-    
-      setUsersWithPasswords(prevUsers => [...prevUsers, newUser]);
-      
+        role: "student",
+        enrolledCourses: [],
+        results: [],
+      });
 
       const { password: _, ...userWithoutPassword } = newUser;
       setUser(userWithoutPassword);
       localStorage.setItem("user", JSON.stringify(userWithoutPassword));
-      
       toast.success(`Welcome to AlpsTech, ${name}!`);
       return true;
     } catch (error) {
-      toast.error("Registration failed. Please try again.");
-      console.error(error);
+      console.error('Signup error:', error);
+      if (error instanceof Error && error.message.includes('already exists')) {
+        toast.error("Email already registered. Please use a different email.");
+      } else {
+        toast.error("Registration failed. Please try again.");
+      }
       return false;
     } finally {
       setIsLoading(false);
@@ -141,45 +84,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem("user");
     toast.info("You have been logged out");
   };
-  const enrollInCourse = (courseId: string) => {
+
+  const enrollInCourse = async (courseId: string) => {
     if (!user) return;
-    
-    const updatedUser = {
-      ...user,
-      enrolledCourses: [...(user.enrolledCourses || []), courseId],
-    };
-    
-    setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
-    
-    const updatedUsers = usersWithPasswords.map(u => {
-      if (u.id === user.id) {
-        return {
-          ...u,
-          enrolledCourses: [...(u.enrolledCourses || []), courseId],
+
+    try {
+      const success = await updateUserEnrollment(user.id, courseId);
+      
+      if (success) {
+        const updatedUser = {
+          ...user,
+          enrolledCourses: [...(user.enrolledCourses || []), courseId],
         };
+        setUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        toast.success("You've successfully enrolled in this course!");
+      } else {
+        toast.error("Failed to enroll in the course");
       }
-      return u;
-    });
-    
-    setUsersWithPasswords(updatedUsers);
-    toast.success("You've successfully enrolled in this course!");
+    } catch (error) {
+      console.error("Error enrolling in course:", error);
+      toast.error("Failed to enroll in the course");
+    }
   };
 
-  // Function to check if a user is enrolled in a course
   const isEnrolled = (courseId: string) => {
     if (!user || !user.enrolledCourses) return false;
     return user.enrolledCourses.includes(courseId);
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isLoading, 
-      login, 
-      signup, 
-      logout, 
-      users: usersWithoutPasswords,
+    <AuthContext.Provider value={{
+      user,
+      isLoading,
+      login,
+      signup,
+      logout,
+      users,
       enrollInCourse,
       isEnrolled
     }}>

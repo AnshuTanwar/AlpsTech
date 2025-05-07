@@ -1,32 +1,34 @@
-
-import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getCourseById } from "@/lib/data";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { getCourseById } from "@/services/courseService";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const CourseDetails = () => {
   const { id } = useParams<{ id: string }>();
-  const [course, setCourse] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const { user, isEnrolled, enrollInCourse } = useAuth();
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const [currentVideoId, setCurrentVideoId] = useState("");
 
-  useEffect(() => {
-    // Simulate API call delay
-    const timer = setTimeout(() => {
-      if (id) {
-        const courseData = getCourseById(id);
-        setCourse(courseData);
-      }
-      setIsLoading(false);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, [id]);
+  // Array of video IDs for each module
+  const moduleVideos = [
+    "SzJ46YA_RaA",  // Module 1 video ID
+    "-uleG_Vecis",  // Module 2 video ID
+    "zOjov-2OZ0E",  // Module 3 video ID
+    "OdziYWEkDIM"   // Module 4 video ID
+  ];
+
+  const { data: course, isLoading, error } = useQuery({
+    queryKey: ['course', id],
+    queryFn: () => getCourseById(id!),
+    enabled: !!id
+  });
 
   const handleEnroll = () => {
     if (!user) {
@@ -34,12 +36,19 @@ const CourseDetails = () => {
       return;
     }
     
-    if (course.enrollmentStatus === "closed") {
+    if (course?.enrollmentStatus === "closed") {
       toast.error("This course is currently closed for enrollment");
       return;
     }
     
-    enrollInCourse(course.id);
+    if (course) {
+      enrollInCourse(course._id);
+    }
+  };
+
+  const handleViewLessons = (moduleIndex: number) => {
+    setCurrentVideoId(moduleVideos[moduleIndex]);
+    setIsVideoOpen(true);
   };
 
   if (isLoading) {
@@ -55,14 +64,16 @@ const CourseDetails = () => {
     );
   }
 
-  if (!course) {
+  if (error || !course) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="max-w-3xl mx-auto">
           <CardContent className="pt-6">
             <div className="text-center py-8">
               <h2 className="text-2xl font-bold mb-2">Course Not Found</h2>
-              <p className="text-gray-600 mb-4">The course you're looking for doesn't exist or has been removed.</p>
+              <p className="text-gray-600 mb-4">
+                {error instanceof Error ? error.message : "The course you're looking for doesn't exist or has been removed."}
+              </p>
               <Button asChild>
                 <Link to="/courses">Browse Courses</Link>
               </Button>
@@ -73,25 +84,25 @@ const CourseDetails = () => {
     );
   }
 
-  const isUserEnrolled = user && isEnrolled(course.id);
-  const canEnroll = !isUserEnrolled && course.enrollmentStatus !== "closed";
+  const isUserEnrolled = user && isEnrolled(course._id);
+  const canEnroll = !isUserEnrolled && course.enrollmentStatus === "open";
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid lg:grid-cols-3 gap-8">
         {/* Course Image and Enrollment */}
         <div className="lg:col-span-1">
           <Card className="sticky top-24">
             <div className="aspect-video w-full overflow-hidden rounded-t-lg">
               <img 
-                src={course.image} 
+                src={course.image || 'https://via.placeholder.com/640x360?text=Course+Image'} 
                 alt={course.title} 
                 className="w-full h-full object-cover"
               />
             </div>
             <CardContent className="pt-6">
               <div className="space-y-2 mb-4">
-                <Badge variant={course.enrollmentStatus === "open" ? "default" : "outline"} className="mb-2">
+                <Badge variant={course.enrollmentStatus === "open" ? "default" : "outline"}>
                   {course.enrollmentStatus === "open" ? "Open for Enrollment" : 
                    course.enrollmentStatus === "in progress" ? "In Progress" : "Closed"}
                 </Badge>
@@ -104,34 +115,31 @@ const CourseDetails = () => {
                   Level: {course.level.charAt(0).toUpperCase() + course.level.slice(1)}
                 </p>
                 <p className="flex items-center text-sm">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><circle cx="12" cy="8" r="4"/><path d="M20 19v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   Instructor: {course.instructor}
                 </p>
               </div>
-              <div className="text-2xl font-bold mb-4">₹{course.price.toLocaleString('en-IN')}</div>
-            </CardContent>
-            <CardFooter>
-              {isUserEnrolled ? (
-                <div className="space-y-2 w-full">
-                  <p className="text-center text-sm text-green-600 mb-2">
-                    You are enrolled in this course
-                  </p>
-                  <Button className="w-full">Continue Learning</Button>
+              
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-2xl font-bold">₹{course.price}</span>
+                  {isUserEnrolled ? (
+                    <Badge variant="outline">Enrolled</Badge>
+                  ) : (
+                    <Button 
+                      onClick={handleEnroll}
+                      disabled={!canEnroll}
+                    >
+                      {canEnroll ? "Enroll Now" : "Enrollment Closed"}
+                    </Button>
+                  )}
                 </div>
-              ) : (
-                <Button 
-                  className="w-full" 
-                  disabled={!canEnroll}
-                  onClick={handleEnroll}
-                >
-                  {course.enrollmentStatus === "closed" ? "Enrollment Closed" : "Enroll Now"}
-                </Button>
-              )}
-            </CardFooter>
+              </div>
+            </CardContent>
           </Card>
         </div>
 
-        {/* Course Details */}
+        {/* Course Content */}
         <div className="lg:col-span-2">
           <div className="mb-6">
             <Link to="/courses" className="text-brand-blue hover:underline inline-flex items-center mb-2">
@@ -149,56 +157,60 @@ const CourseDetails = () => {
               <TabsTrigger value="reviews">Reviews</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="content" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>What You'll Learn</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <li className="flex items-start">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 mr-2 mt-1"><polyline points="20 6 9 17 4 12"/></svg>
-                      <span>Understand core concepts and principles</span>
-                    </li>
-                    <li className="flex items-start">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 mr-2 mt-1"><polyline points="20 6 9 17 4 12"/></svg>
-                      <span>Build real-world projects step by step</span>
-                    </li>
-                    <li className="flex items-start">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 mr-2 mt-1"><polyline points="20 6 9 17 4 12"/></svg>
-                      <span>Master essential techniques and tools</span>
-                    </li>
-                    <li className="flex items-start">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 mr-2 mt-1"><polyline points="20 6 9 17 4 12"/></svg>
-                      <span>Apply knowledge in practical scenarios</span>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Course Modules</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {[1, 2, 3, 4].map((module) => (
-                      <div key={module} className="border rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <h3 className="font-medium">Module {module}: Key Concepts</h3>
-                          <Badge variant="outline">4 Lessons</Badge>
+            <TabsContent value="content">
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>What You'll Learn</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2">
+                      <li className="flex items-start">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 mr-2 mt-1"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Understand core concepts and principles</span>
+                      </li>
+                      <li className="flex items-start">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 mr-2 mt-1"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Build practical projects</span>
+                      </li>
+                      <li className="flex items-start">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 mr-2 mt-1"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Apply knowledge in practical scenarios</span>
+                      </li>
+                    </ul>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Course Modules</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {[1, 2, 3, 4].map((module, index) => (
+                        <div key={module} className="border rounded-lg p-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <h3 className="font-medium">Module {module}: Key Concepts</h3>
+                            <Badge variant="outline">4 Lessons</Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-2">Learn the fundamental building blocks and essential theory.</p>
+                          {isUserEnrolled ? (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handleViewLessons(index)}
+                            >
+                              View Lessons
+                            </Button>
+                          ) : (
+                            <p className="text-sm text-gray-500">Enroll to access lessons</p>
+                          )}
                         </div>
-                        <p className="text-sm text-gray-600 mb-2">Learn the fundamental building blocks and essential theory.</p>
-                        {isUserEnrolled ? (
-                          <Button variant="outline" size="sm">View Lessons</Button>
-                        ) : (
-                          <p className="text-sm text-gray-500">Enroll to access lessons</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
             
             <TabsContent value="instructor">
@@ -207,20 +219,21 @@ const CourseDetails = () => {
                   <CardTitle>About the Instructor</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                  <div className="flex items-start space-x-4">
+                    <div className="w-24 h-24 rounded-full overflow-hidden flex-shrink-0">
+                      <img 
+                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(course.instructor)}&background=random`}
+                        alt={course.instructor}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div>
-                      <h3 className="text-lg font-medium">{course.instructor}</h3>
-                      <p className="text-gray-600">Expert in {course.title.split(" ")[0]}</p>
+                      <h3 className="text-lg font-medium mb-2">{course.instructor}</h3>
+                      <p className="text-gray-600">
+                        Expert instructor with extensive experience in teaching and practical application.
+                        Committed to helping students master the subject matter through hands-on learning.
+                      </p>
                     </div>
-                  </div>
-                  <p className="mb-4">With over 10 years of industry experience, {course.instructor} has helped thousands of students master complex concepts through clear, practical instruction.</p>
-                  <div className="flex gap-2">
-                    <Badge variant="outline" className="bg-gray-100">15+ Courses</Badge>
-                    <Badge variant="outline" className="bg-gray-100">4.8 Rating</Badge>
-                    <Badge variant="outline" className="bg-gray-100">10k+ Students</Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -230,59 +243,41 @@ const CourseDetails = () => {
               <Card>
                 <CardHeader>
                   <CardTitle>Student Reviews</CardTitle>
-                  <CardDescription>What our students are saying about this course</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-6">
-                    {[...Array(3)].map((_, i) => (
-                      <div key={i} className="border-b pb-4 last:border-b-0 last:pb-0">
-                        <div className="flex justify-between mb-2">
-                          <div className="flex items-center">
-                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0 mr-2">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                            </div>
-                            <span className="font-medium">Student {i + 1}</span>
-                          </div>
-                          <div className="flex">
-                            {[...Array(5)].map((_, starIndex) => (
-                              <svg key={starIndex} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={starIndex < 4 + i % 2 ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-yellow-500"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                            ))}
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-700">
-                          {i === 0 ? "This course exceeded my expectations. The content is well-structured and the instructor explains complex topics in an easy-to-understand way." :
-                           i === 1 ? "Very practical course with lots of hands-on examples. I was able to apply what I learned immediately in my projects." :
-                           "Great value for money. Comprehensive coverage of the subject matter with good pacing."}
-                        </p>
-                      </div>
-                    ))}
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">No reviews yet.</p>
+                    {isUserEnrolled && (
+                      <Button className="mt-4" variant="outline">Write a Review</Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
-          
-          {/* Call to Action */}
-          {!isUserEnrolled && (
-            <Card className="bg-brand-blue text-white">
-              <CardContent className="pt-6">
-                <div className="text-center py-4">
-                  <h2 className="text-2xl font-bold mb-2">Ready to start learning?</h2>
-                  <p className="mb-4">Join thousands of students already enrolled in this course.</p>
-                  <Button 
-                    variant="outline" 
-                    className="bg-white text-brand-blue hover:bg-gray-100"
-                    disabled={!canEnroll}
-                    onClick={handleEnroll}
-                  >
-                    {course.enrollmentStatus === "closed" ? "Enrollment Closed" : "Enroll Now"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
+
+      {/* Video Dialog */}
+      <Dialog open={isVideoOpen} onOpenChange={setIsVideoOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Course Video</DialogTitle>
+          </DialogHeader>
+          <div className="aspect-video w-full">
+            <iframe
+              width="100%"
+              height="100%"
+              src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=1`}
+              title="Course Video"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="rounded-lg"
+            ></iframe>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
