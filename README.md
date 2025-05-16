@@ -1,4 +1,4 @@
-# 🎓 AlpesTech
+# 🎓 AlpsTech
 
 **AlpsTech** is a modern educational platform designed for both administrators and students. It provides robust dashboards to manage courses, track results, and streamline the academic experience.
 
@@ -52,7 +52,7 @@ This project is powered by a modern frontend stack:
 
 ### 1. Clone the Repo
 ```bash
-git clone https://github.com/AnshuTanwar/Alps-sTech-Reaching-the-peak-of-learning-and-skills
+git clone https://github.com/AnshuTanwar/AlpsTech
 cd alpstech
  
 ### 2. Install Dependencies
