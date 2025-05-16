@@ -1,4 +1,4 @@
-# 🎓 AlpsTech
+# 🎓 AlpesTech
 
 **AlpsTech** is a modern educational platform designed for both administrators and students. It provides robust dashboards to manage courses, track results, and streamline the academic experience.
 
