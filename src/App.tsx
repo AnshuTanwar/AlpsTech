@@ -19,11 +19,9 @@ import AdminStudents from "./pages/AdminStudents";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import MongoTest from "./pages/MongoTest";
-
-// Layout
 import Layout from "./components/Layout";
 import AdminLayout from "./components/AdminLayout";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute from "./components/ProtectedRoute"; 
 
 const queryClient = new QueryClient({
   defaultOptions: {
