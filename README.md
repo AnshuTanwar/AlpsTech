@@ -44,7 +44,7 @@ This project is powered by a modern frontend stack:
 
 ---
 
-### 🎥 Video Demo
+### Video Demo
 
 ▶️ [Watch Demo Video](https://ik.imagekit.io/anshut/alpstech/Recording%202025-04-09%20204544.mp4?updatedAt=1744211855521)
 
